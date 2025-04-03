@@ -4,7 +4,8 @@ const server = createServer((request, response) => {
   // verifichiamo che la request arrivi
   console.log("request received");
 
-  response.statusCode = 200;
+  // si può settare anche ad altro?
+  response.statusCode = 401;
 
   // così il server sa che la response dovrà essere costituita da un HTML
   response.setHeader("Content-Type", "text/html");
