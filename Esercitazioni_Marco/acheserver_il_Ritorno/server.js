@@ -13,6 +13,10 @@ fastify.register(require("@fastify/cors"), {
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
+fastify.register(require("@fastify/postgres"), {
+  connectionString: "postgres://postgres:password@localhost:5432/restaurant",
+});
+
 const userDataPlugin = fp(async function (fastify, options) {
   const dataDir = path.join(__dirname, "data");
   await fs.mkdir(dataDir, {
@@ -29,18 +33,19 @@ const userDataPlugin = fp(async function (fastify, options) {
       throw error;
     }
   });
-});
 
-fastify.decorate("saveUserData", async function (userId, data) {
-  const userFilePath = path.join(dataDir, `user_${userId}.json`);
-  await fs.writeFile(userFilePath, JSON.stringify(data, null, 2)); // il due è un dato per la formattazione
-  return true;
+  fastify.decorate("saveUserData", async function (userId, data) {
+    const userFilePath = path.join(dataDir, `user_${userId}.json`);
+    await fs.writeFile(userFilePath, JSON.stringify(data, null, 2)); // il due è un dato per la formattazione
+    return true;
+  });
 });
 
 fastify.register(userDataPlugin);
 
 // ROTTA PRINCIPALE
 fastify.get("/", async (request, reply) => {
+  await fastify.pg.connect();
   return {
     status: "online",
     message: "Acheserver_il_Ritorno operativo",
@@ -70,20 +75,12 @@ fastify.setErrorHandler((error, request, reply) => {
   });
 });
 
-// rotta GET /users che ritorna un array con tutti gli utenti
-
-// rotta GET (dinamica) /users/:id che ritorna il singolo utente by ID
-
-// rotta POST nuovo utente o update esistente /users/:id
-
-// rotta DELETE /users/:id che rimuove l'utente
-
 // registrazione di rotte API con prefisso
 fastify.register(
   async function apiRoutes(fastify, options) {
-    // percorso ai dati
     fastify.get("/users", async (request, reply) => {
-      const dataDir = path.join(__dirname, "data"); // dirname è cartella corrente, data è quella di arrivo
+      // percorso ai dati
+      const dataDir = path.join(__dirname, "data"); // dirname è la cartella corrente, data è quella di arrivo
       // file contenuti dentro "data"
       const files = await fs.readdir(dataDir);
 
@@ -91,8 +88,10 @@ fastify.register(
       const userFiles = files.filter(
         (file) => file.startsWith("user_") && file.endsWith(".json")
       );
+
       // predisponiamo l'array di risultati
       const users = [];
+
       // cicliamo l'array di file per prendere i contenuti ed inserirli dentro users
       for (const file of userFiles) {
         const data = await fs.readFile(path.join(dataDir, file), "utf-8");
@@ -104,18 +103,16 @@ fastify.register(
       }
 
       // ritorniamo l'oggetto con tutti gli users
-      return {
-        users,
-      };
+      return { users };
     });
 
     fastify.post("/users/:id", async (request, reply) => {
-      const { id } = request.params; // id passato nell'url
+      const { id } = request.params;
 
       const newUserData = request.body;
 
       // verifichiamo che l'id del parametro corrisponda all'id del body
-      if (newUserData.id && newUserData !== id) {
+      if (newUserData.id && newUserData.id !== id) {
         reply.code(400).send({
           error: "Id utente nel body non corrisponde all'id del percorso",
         });
@@ -151,6 +148,7 @@ fastify.register(
             error: "Utente non trovato",
           };
         }
+
         throw error;
       }
 
@@ -158,11 +156,49 @@ fastify.register(
 
       return {
         success: true,
-        message: `Utente ${id} cancellato`,
+        message: `Utente ${id} eliminato con successo`,
       };
     });
-  },
 
+    fastify.get("/clienti", async (request, reply) => {
+      try {
+        const { rows } = await fastify.pg.query("SELECT * FROM clienti");
+        return {
+          clienti: rows,
+        };
+      } catch (err) {
+        reply.log.error(err);
+        reply.code(500).send({ error: "Errore DB" });
+      }
+    });
+
+    fastify.get("/clienti/:id", async (request, reply) => {
+      const { id } = request.params;
+      const { rows } = await fastify.pg.query(
+        "SELECT * FROM clienti WHERE id = $1",
+        [id]
+      );
+      return (
+        rows[0] || fastify.code(404).send({ error: "Cliente non trovato" })
+      );
+    }),
+      fastify.post("/clienti", async (request, replay) => {
+        const { nome, telefono, email } = request.body;
+        const { rows } = await fastify.pg.query(
+          "INSERTO INTO clienti (nome, telefono, email) VALUES ($1, $2, $3) RETUrNING *",
+          [nome, telefono, email]
+        );
+        return rows[0];
+      }),
+      fastify.get("/clienti/search/:q", async (request, reply) => {
+        const { q } = request.params;
+        const { rows } = await fastify.pg.query(
+          "SELECT * FROM clienti WHERE nome LIKE $1 OR email LIKE $1",
+          [`%${q}%`]
+        );
+        return rows;
+      });
+  },
   {
     prefix: "/api",
   }
@@ -171,7 +207,7 @@ fastify.register(
 // FUNZIONE AVVIO DEL SERVER
 const start = async () => {
   try {
-    const PORT = process.env.PORT || 3000;
+    const PORT = process.env.PORT || 3001;
     const HOST = process.env.HOST || "0.0.0.0";
     await fastify.listen({
       port: PORT,
@@ -189,5 +225,3 @@ const start = async () => {
 };
 
 start();
-
-// https://www.postgresql.org/download/
