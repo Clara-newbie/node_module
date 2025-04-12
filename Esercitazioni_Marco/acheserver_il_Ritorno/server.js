@@ -198,6 +198,56 @@ fastify.register(
         );
         return rows;
       });
+
+    fastify.get("/prenotazioni", async (request, reply) => {
+      const { rows } = await fastify.pg.query(`
+        SELECT p.id, c.nome AS cliente, t.numero AS tavolo, p.data, p.numero_persone, p.note
+        From prenotazioni AS p
+        JOIN clienti AS c ON c.id = p.cliente_id
+        JOIN tavoli AS t ON t.id = p.tavolo_id
+        ORDER BY p.data DESC;
+        `);
+      return rows;
+    });
+
+    fastify.post("/prenotazioni", async (request, reply) => {
+      const { cliente_id, tavolo_id, data, numero_persone, note } =
+        request.body;
+      const { rows } = await fastify.pg.query(
+        `
+        INSERT INTO prenotazioni (cliente_id, tavolo_id, data, numero_persone, note)
+        VALUES ($1, $2, $3, $4, $5) RETURNING *
+        `,
+        [cliente_id, tavolo_id, data, numero_persone, note]
+      );
+      return rows[0];
+    });
+
+    fastify.get("/ordini", async () => {
+      const { rows } = await fastify.pg.query(`
+    SELECT o.id, o.data, o.stato, t.numero AS tavolo, c.nome AS cameriere
+    FROM ordini AS o
+    JOIN tavoli AS t ON t.id = o.tavolo_id
+    JOIN camerieri AS c ON c.id = o.cameriere_id
+    ORDER BY o.data DESC;
+    `);
+
+      for (const row of rows) {
+        const { id: ordine_id } = row;
+        const { rows: dettagli } = await fastify.pg.query(
+          `
+          SELECT p.nome, p.prezzo, d.*
+          FROM dettagli_ordine AS d
+          JOIN piatti AS p ON p.id = d.piatto_id
+          WHERE ordine_id = $1
+        `,
+          [ordine_id]
+        );
+        row.dettagli = dettagli;
+      }
+
+      return rows;
+    });
   },
   {
     prefix: "/api",
@@ -207,7 +257,7 @@ fastify.register(
 // FUNZIONE AVVIO DEL SERVER
 const start = async () => {
   try {
-    const PORT = process.env.PORT || 3001;
+    const PORT = process.env.PORT || 3000;
     const HOST = process.env.HOST || "0.0.0.0";
     await fastify.listen({
       port: PORT,
