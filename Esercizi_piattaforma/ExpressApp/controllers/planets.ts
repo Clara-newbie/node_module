@@ -1,5 +1,6 @@
 import Joi from "joi";
 import pgPromise from "pg-promise";
+import { Request, Response } from "express";
 
 // collegamento db
 const db = pgPromise()("postgres://postgres:password@localhost:5432/postgres");
@@ -9,7 +10,8 @@ const setupDb = async () => {
 
     CREATE TABLE planets (
         id SERIAL NOT NULL PRIMARY KEY,
-        name TEXT NOT NULL
+        name TEXT NOT NULL,
+        image TEXT
         );
     `);
 
@@ -40,13 +42,13 @@ let planets: Planets = [
 ];
 
 // CALLBACK CHIAMATE
-const getAll = async (req, res) => {
+const getAll = async (req: Request, res: Response) => {
   const planets = await db.many(`SELECT * FROM planets;`);
 
   res.status(200).json(planets);
 };
 
-const getOnebyId = async (req, res) => {
+const getOnebyId = async (req: Request, res: Response) => {
   const { id } = req.params;
   //const planetById = planets.find((p) => p.id === Number(id));
   const planetById = await db.one(
@@ -61,7 +63,7 @@ const getOnebyId = async (req, res) => {
   }
 };
 
-const create = async (req, res) => {
+const create = async (req: Request, res: Response) => {
   const { id, name } = req.body;
   const myNewPlanet = { id, name };
 
@@ -77,7 +79,7 @@ const create = async (req, res) => {
   }
 };
 
-const updateById = async (req, res) => {
+const updateById = async (req: Request, res: Response) => {
   const { id } = req.params;
   const { name } = req.body;
   //planets = planets.map((p) => (p.id === Number(id) ? { ...p, name } : p));
@@ -85,11 +87,23 @@ const updateById = async (req, res) => {
   res.status(200).json({ msg: "Planet updated successfully!" });
 };
 
-const deleteById = async (req, res) => {
+const deleteById = async (req: Request, res: Response) => {
   const { id } = req.params;
   //planets = planets.filter((p) => {p.id !== Number(id); });
   await db.none(`DELETE FROM planets WHERE id=$1;`, Number(id));
   res.status(200).json({ msg: "Planet deleted successfully!" });
+};
+
+const createImage = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const fileName = req.file?.path;
+
+  if (fileName) {
+    db.none(`UPDATE planets SET image=$2 WHERE id=$1`, [id, fileName]);
+    res.status(201).json({ msg: "Planet image uploaded successfully." });
+  } else {
+    res.status(404).json({ msg: "Planet image failed to upload." });
+  }
 };
 
 // VALIDATION
@@ -99,4 +113,4 @@ const schema = Joi.object({
   name: Joi.string().required(),
 });
 
-export { getAll, getOnebyId, create, updateById, deleteById };
+export { getAll, getOnebyId, create, updateById, deleteById, createImage };

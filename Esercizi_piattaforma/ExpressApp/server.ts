@@ -9,6 +9,17 @@ import {
   updateById,
   deleteById,
 } from "./controllers/planets";
+import multer from "multer";
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "./uploads");
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  },
+});
+const upload = multer({ storage });
 
 // a che serve?
 dotenv.config();
@@ -28,6 +39,8 @@ app.get("/api/planets", getAll);
 app.get("/api/planets/:id", getOnebyId);
 
 app.post("/api/planets", create);
+
+app.post("/api/planets/:id/image", upload.single("image"), createImage);
 
 app.put("/api/planets/:id", updateById);
 
