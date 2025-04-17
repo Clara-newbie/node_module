@@ -1,6 +1,8 @@
-import express from "express";
+import "./passport.js";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import multer from "multer";
+import express from "express";
 import "express-async-errors";
 import {
   getAll,
@@ -10,8 +12,8 @@ import {
   updateById,
   deleteById,
 } from "./controllers/planets";
-import { logIn, signUp } from "./controllers/users.js";
-import multer from "multer";
+import authorize from "./authorize.js";
+import { logIn, signUp, logOut } from "./controllers/users.js";
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -21,9 +23,9 @@ const storage = multer.diskStorage({
     cb(null, file.originalname);
   },
 });
+
 const upload = multer({ storage });
 
-// a che serve?
 dotenv.config();
 
 const app = express();
@@ -45,6 +47,8 @@ app.post("/api/planets", create);
 app.post("api/users/login", logIn);
 
 app.post("api/users/signup", signUp);
+
+app.get("api/users/logout", authorize, logOut);
 
 app.post("/api/planets/:id/image", upload.single("image"), createImage);
 

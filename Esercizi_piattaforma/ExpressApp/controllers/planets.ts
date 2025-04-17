@@ -51,7 +51,7 @@ const create = async (req: Request, res: Response) => {
   const newValidatedPlanet = schema.validate(myNewPlanet);
   // se la validazione non va a buon fine, errore, altrimenti crea un pianeta
   if (newValidatedPlanet.error) {
-    return res.status(400).json({ msg: newValidatedPlanet.error });
+    res.status(400).json({ msg: newValidatedPlanet.error });
   } else {
     // planets = [...planets, myNewPlanet];
     await db.none(`INSERT INTO planets (name) VALUES $1`, name);

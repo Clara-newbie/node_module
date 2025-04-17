@@ -1,7 +1,7 @@
-import { db } from "./../ExpressApp/db.js";
+import { db } from "./db.js";
+import passport from "passport";
 import * as dotenv from "dotenv";
 dotenv.config();
-import passport from "passport";
 import passportJWT from "passport-jwt";
 
 const { SECRET } = process.env;
