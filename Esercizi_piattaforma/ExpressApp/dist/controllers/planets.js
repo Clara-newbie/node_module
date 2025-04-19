@@ -12,25 +12,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteById = exports.updateById = exports.create = exports.getOnebyId = exports.getAll = void 0;
+exports.createImage = exports.deleteById = exports.updateById = exports.create = exports.getOnebyId = exports.getAll = void 0;
 const joi_1 = __importDefault(require("joi"));
-const pg_promise_1 = __importDefault(require("pg-promise"));
-// collegamento db
-const db = (0, pg_promise_1.default)()("postgres://postgres:password@localhost:5432/postgres");
-const setupDb = () => __awaiter(void 0, void 0, void 0, function* () {
-    db.none(`
-    DROP TABLE IF EXIST planets
-
-    CREATE TABLE planets (
-        id SERIAL NOT NULL PRIMARY KEY,
-        name TEXT NOT NULL
-        );
-    `);
-    yield db.none(`INSERT INTO planets (name) VALUES ('Earth')`);
-    yield db.none(`INSERT INTO planets (name) VALUES ('Mars')`);
-    yield db.none(`INSERT INTO planets (name) VALUES ('Jupiter')`);
-});
-setupDb();
+const db_1 = require("./../db");
 let planets = [
     {
         id: 1,
@@ -43,14 +27,14 @@ let planets = [
 ];
 // CALLBACK CHIAMATE
 const getAll = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const planets = yield db.many(`SELECT * FROM planets;`);
+    const planets = yield db_1.db.many(`SELECT * FROM planets;`);
     res.status(200).json(planets);
 });
 exports.getAll = getAll;
 const getOnebyId = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     //const planetById = planets.find((p) => p.id === Number(id));
-    const planetById = yield db.one(`SELECT * FROM planets WHERE id=$1;`, Number(id));
+    const planetById = yield db_1.db.one(`SELECT * FROM planets WHERE id=$1;`, Number(id));
     if (planetById) {
         res.status(200).json(planetById);
     }
@@ -66,11 +50,11 @@ const create = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const newValidatedPlanet = schema.validate(myNewPlanet);
     // se la validazione non va a buon fine, errore, altrimenti crea un pianeta
     if (newValidatedPlanet.error) {
-        return res.status(400).json({ msg: newValidatedPlanet.error });
+        res.status(400).json({ msg: newValidatedPlanet.error });
     }
     else {
         // planets = [...planets, myNewPlanet];
-        yield db.none(`INSERT INTO planets (name) VALUES $1`, name);
+        yield db_1.db.none(`INSERT INTO planets (name) VALUES $1`, name);
         res.status(201).json({ msg: "Planet created successfully!" });
     }
 });
@@ -79,17 +63,31 @@ const updateById = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
     const { id } = req.params;
     const { name } = req.body;
     //planets = planets.map((p) => (p.id === Number(id) ? { ...p, name } : p));
-    yield db.none(`UPDATE FROM planets SET name=$ WHERE id=$1;`, [id, name]);
+    yield db_1.db.none(`UPDATE FROM planets SET name=$ WHERE id=$1;`, [id, name]);
     res.status(200).json({ msg: "Planet updated successfully!" });
 });
 exports.updateById = updateById;
 const deleteById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     //planets = planets.filter((p) => {p.id !== Number(id); });
-    yield db.none(`DELETE FROM planets WHERE id=$1;`, Number(id));
+    yield db_1.db.none(`DELETE FROM planets WHERE id=$1;`, Number(id));
     res.status(200).json({ msg: "Planet deleted successfully!" });
 });
 exports.deleteById = deleteById;
+const createImage = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    console.log(req.file);
+    const { id } = req.params;
+    const fileName = (_a = req.file) === null || _a === void 0 ? void 0 : _a.path;
+    if (fileName) {
+        db_1.db.none(`UPDATE planets SET image=$2 WHERE id=$1`, [id, fileName]);
+        res.status(201).json({ msg: "Planet image uploaded successfully." });
+    }
+    else {
+        res.status(404).json({ msg: "Planet image failed to upload." });
+    }
+});
+exports.createImage = createImage;
 // VALIDATION
 // che differenza c'è con typescript?
 const schema = joi_1.default.object({

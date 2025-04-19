@@ -75,6 +75,8 @@ const deleteById = async (req: Request, res: Response) => {
 };
 
 const createImage = async (req: Request, res: Response) => {
+  console.log(req.file);
+
   const { id } = req.params;
   const fileName = req.file?.path;
 

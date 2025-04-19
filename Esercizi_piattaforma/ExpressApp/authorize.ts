@@ -6,6 +6,8 @@ const authorize = (req: Request, res: Response, next: NextFunction) => {
     "jwt",
     { session: false },
     (err: any, user: Express.User) => {
+      console.log(3, user);
+
       if (!user || err) {
         res.status(401).json({ msg: "Unauthorized." });
       } else {
