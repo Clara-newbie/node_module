@@ -1,11 +1,10 @@
 const fastify = require("fastify")({
   logger: true,
 });
-const { timeStamp } = require("console");
-const fs = require("fs/promises");
 const path = require("path");
+const fs = require("node:fs");
 const fp = require("fastify-plugin");
-const { request } = require("http");
+const { pipeline } = require("node:stream/promises");
 
 fastify.register(require("@fastify/cors"), {
   origin: "*",
@@ -13,15 +12,30 @@ fastify.register(require("@fastify/cors"), {
   allowedHeaders: ["Content-Type", "Authorization"],
 });
 
+fastify.register(require("./plugins/jwt"));
+
+fastify.register(require("@fastify/static"), {
+  root: path.join(process.cwd(), "uploads"),
+  prefix: "/uploads/",
+});
+
 fastify.register(require("@fastify/postgres"), {
   connectionString: "postgres://postgres:password@localhost:5432/restaurant",
 });
 
+fastify.register(require("@fastify/multipart"));
+
 const userDataPlugin = fp(async function (fastify, options) {
   const dataDir = path.join(__dirname, "data");
-  await fs.mkdir(dataDir, {
-    recursive: true,
-  });
+  await fs.mkdir(
+    dataDir,
+    {
+      recursive: true,
+    },
+    (err) => {
+      if (err) throw err;
+    }
+  );
 
   fastify.decorate("getUserData", async function (userId) {
     const userFilePath = path.join(dataDir, `user_${userId}.json`);
@@ -247,6 +261,22 @@ fastify.register(
       }
 
       return rows;
+    });
+
+    // rivedi spiegazione marco sul suo funzionamento
+    fastify.post("/upload", async (req, reply) => {
+      const data = await req.file();
+      const ext = path.extname(data.filename);
+      const name = path.basename(data.filename, ext);
+      const timestamp = Date.now();
+      const filename = `${name}-${timestamp}${ext}`;
+      const filepath = path.join(__dirname, "uploads", filename);
+
+      await pipeline(data.file, fs.createWriteStream(filepath));
+
+      const url = `/uploads/${filename}`;
+
+      reply.send({ file: url });
     });
   },
   {
